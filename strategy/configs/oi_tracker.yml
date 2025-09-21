@@ -1,0 +1,13 @@
+default:
+  nifty_symbol: 'NSE:NIFTY 50'
+  # IMPORTANT: Change this to the current month's NIFTY option series prefix.
+  # e.g. for September 2025 expiry, it might be 'NIFTY259'.
+  # Check your broker's instrument list for the correct prefix.
+  instrument_prefix: 'NIFTY25SEP'
+  color_thresholds:
+    '3m': 10
+    '5m': 12
+    '10m': 15
+    '15m': 30
+    '30m': 30
+    '3h': 100
