@@ -1,0 +1,77 @@
+//@version=5
+indicator("Candle Breakout Strategy", overlay=true)
+
+// === INPUTS ===
+entryLookback = input.int(3, "Entry Lookback Period", minval=2, maxval=10)
+exitLookback  = input.int(2, "Exit Lookback Period", minval=1, maxval=5)
+stopLossPts   = input.float(25.0, "Stop Loss (in Points)", minval=1)
+
+// === LOGIC ===
+
+// --- Entry Conditions ---
+highestHigh = ta.highest(high, entryLookback)[1]
+lowestLow   = ta.lowest(low, entryLookback)[1]
+
+prevCandleIsGreen = close[1] > open[1]
+prevCandleIsRed   = close[1] < open[1]
+
+isBuyEntry  = close > highestHigh and prevCandleIsGreen
+isSellEntry = close < lowestLow and prevCandleIsRed
+
+// --- State Management ---
+var int tradeState = 0      // 0=Flat, 1=Long, -1=Short
+var float entryPrice = na
+var float stopLossLevel = na
+
+// --- Exit Conditions ---
+exitOfPrevLow  = low[exitLookback]
+exitOfPrevHigh = high[exitLookback]
+
+isBuyExit_candle = close < exitOfPrevLow
+isSellExit_candle = close > exitOfPrevHigh
+isBuyExit_sl = tradeState == 1 and low <= stopLossLevel
+isSellExit_sl = tradeState == -1 and high >= stopLossLevel
+
+
+// --- Determine Signals ---
+signalBuy  = tradeState == 0 and isBuyEntry
+signalSell = tradeState == 0 and isSellEntry
+
+signalExitBuy  = tradeState == 1 and (isBuyExit_candle or isBuyExit_sl)
+signalExitSell = tradeState == -1 and (isSellExit_candle or isSellExit_sl)
+
+// --- Update State ---
+if (signalBuy)
+    tradeState := 1
+    entryPrice := close
+    stopLossLevel := close - stopLossPts
+
+if (signalSell)
+    tradeState := -1
+    entryPrice := close
+    stopLossLevel := close + stopLossPts
+
+if (signalExitBuy or signalExitSell)
+    tradeState := 0
+    entryPrice := na
+    stopLossLevel := na
+
+
+// === PLOTTING ===
+// Plot SL line
+plot(tradeState != 0 ? stopLossLevel : na, "Stop Loss", color.red, plot.style_linebr)
+
+// Plot entry signals
+plotshape(signalBuy, "Buy Signal", shape.labelup, location.belowbar, color.new(color.green, 0), text="BUY", textcolor=color.white, size=size.normal)
+plotshape(signalSell, "Sell Signal", shape.labeldown, location.abovebar, color.new(color.red, 0), text="SELL", textcolor=color.white, size=size.normal)
+
+// Plot exit signals
+plotshape(signalExitBuy, "Exit Buy", shape.xcross, location.abovebar, color.new(color.orange, 0), size=size.small)
+plotshape(signalExitSell, "Exit Sell", shape.xcross, location.belowbar, color.new(color.orange, 0), size=size.small)
+
+
+// === ALERTS ===
+alertcondition(signalBuy, title="Buy Signal", message="Buy Signal for {{ticker}}")
+alertcondition(signalSell, title="Sell Signal", message="Sell Signal for {{ticker}}")
+alertcondition(signalExitBuy, title="Exit Buy Signal", message="Exit Buy for {{ticker}}")
+alertcondition(signalExitSell, title="Exit Sell Signal", message="Exit Sell for {{ticker}}")

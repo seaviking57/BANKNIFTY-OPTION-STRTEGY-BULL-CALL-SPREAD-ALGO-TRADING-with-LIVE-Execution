@@ -1,0 +1,33 @@
+# Default configuration for the Renko Strategy
+default:
+  # -- Data & Instrument Settings --
+  data_instrument_symbol: 'NSE:NIFTY BANK' # The instrument to generate Renko bricks from
+  timeframe_minutes: 2                   # The timeframe for fetching historical data (e.g., 2 for 2-minute candles)
+  lot_size_multiplier: 1                 # How many lots to trade per signal
+
+  # -- Renko & EMA Parameters --
+  renko_brick_size: 6      # The fixed size of each Renko brick in points
+  ema_period: 21           # The period for the Exponential Moving Average
+
+  # -- Entry Conditions --
+  entry_trend_bricks: 3              # Number of same-colored bricks required in a row to confirm a trend
+  entry_ema_confirmation_bricks: 2   # Number of recent bricks that must be above/below the EMA for entry
+
+  # -- Exit Conditions --
+  exit_reversal_bricks: 2  # Number of opposite-colored bricks to signal an exit
+  exit_ema_cross_bricks: 1 # Number of recent bricks crossing the EMA to signal an exit
+
+  # -- Risk Management --
+  stop_loss_points: 30                  # Initial stop-loss in points from the entry price
+  trailing_sl_activation_points: 15     # P/L in points required to activate the trailing stop-loss
+  trailing_sl_target_points: 0          # How many points above/below entry price to set the TSL (0 means move to break-even)
+
+  # -- Timing & Execution --
+  trading_start_time: "09:20"    # Time to start looking for trades
+  trading_end_time: "15:05"      # Time to stop looking for new trades
+  square_off_time: "15:17"       # Time to automatically close any open position
+  auto_shutdown_time: "15:35"    # Time to shut down the script completely
+
+  # -- System Settings --
+  check_interval_seconds: 30     # How often to check for signals and update data (in seconds)
+  display_interval_seconds: 60   # How often to refresh the dashboard display (in seconds)

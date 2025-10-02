@@ -1,0 +1,22 @@
+# Default configuration for the Candle Breakout Strategy
+default:
+  # -- Instrument and Data --
+  underlying_instrument: 'BANKNIFTY' # The underlying to trade (e.g., 'NIFTY', 'BANKNIFTY')
+  timeframe_minutes: 5             # The timeframe for the candles (e.g., 5 for 5-minute candles)
+
+  # -- Strategy Logic --
+  breakout_candles: 3 # Number of previous candles to form the breakout range
+  lot_size_multiplier: 1 # Number of lots to trade per signal
+
+  # -- Risk Management --
+  stop_loss_points: 50  # Stop-loss in points from the entry price
+  target_points: 100    # Target profit in points from the entry price
+
+  # -- Timing & Execution --
+  trading_start_time: "09:30" # Time to start looking for trades (should be after the initial candles form)
+  trading_end_time: "15:00"   # Time to stop looking for new trades
+  square_off_time: "15:15"    # Time to automatically close any open position
+  auto_shutdown_time: "15:35" # Time to shut down the script completely
+
+  # -- System Settings --
+  check_interval_seconds: 60  # How often to check for a breakout (in seconds)

@@ -1,0 +1,82 @@
+//@version=5
+indicator("Previous Candle Breakout Indicator", overlay=true)
+
+// === INPUTS ===
+lookbackEntry = input.int(3, "Lookback for Entry Signal", minval=2, maxval=6, tooltip="Number of previous candles to look back to find the highest high or lowest low for an entry signal.")
+lookbackExit  = input.int(2, "Lookback for Exit Signal", minval=1, maxval=4, tooltip="The Nth previous candle's low/high to use as the exit signal.")
+
+// === LOGIC ===
+
+// --- Entry Conditions ---
+// Highest high and lowest low over the lookback period, excluding the current bar.
+highestHighPrev = ta.highest(high, lookbackEntry)[1]
+lowestLowPrev   = ta.lowest(low, lookbackEntry)[1]
+
+// Check if the immediate previous candle was green or red.
+prevCandleIsGreen = close[1] > open[1]
+prevCandleIsRed   = close[1] < open[1]
+
+// Define the raw entry signals based on the rules.
+isBuyEntry  = close > highestHighPrev and prevCandleIsGreen
+isSellEntry = close < lowestLowPrev and prevCandleIsRed
+
+
+// --- State Management (to track if we are in a trade) ---
+var int tradeState = 0 // 0=Flat, 1=Long, -1=Short
+var bool buyExitConditionMet = false
+var bool sellExitConditionMet = false
+
+// Check for a new buy signal ONLY if we are currently flat.
+if (tradeState == 0 and isBuyEntry)
+    tradeState := 1 // Enter Long state
+
+// Check for a new sell signal ONLY if we are currently flat.
+if (tradeState == 0 and isSellEntry)
+    tradeState := -1 // Enter Short state
+
+
+// --- Exit Conditions ---
+// Raw exit signals
+isBuyExit  = close < low[lookbackExit]
+isSellExit = close > high[lookbackExit]
+
+// Check for an exit signal ONLY if we are in the corresponding trade.
+if (tradeState == 1 and isBuyExit)
+    tradeState := 0 // Exit Long state, go back to Flat
+    buyExitConditionMet := true
+
+if (tradeState == -1 and isSellExit)
+    tradeState := 0 // Exit Short state, go back to Flat
+    sellExitConditionMet := true
+
+
+// --- Generate Final Signals for Plotting and Alerts ---
+// We use tradeState[1] to ensure the signal fires only on the bar of the state change.
+signalBuy  = tradeState == 1 and tradeState[1] == 0
+signalSell = tradeState == -1 and tradeState[1] == 0
+signalExitBuy = tradeState == 0 and tradeState[1] == 1 and buyExitConditionMet
+signalExitSell = tradeState == 0 and tradeState[1] == -1 and sellExitConditionMet
+
+// Reset exit condition flags
+if buyExitConditionMet
+    buyExitConditionMet := false
+if sellExitConditionMet
+    sellExitConditionMet := false
+
+// === PLOTTING ===
+// Plot entry signals on the chart.
+plotshape(signalBuy, "Buy Signal", shape.labelup, location.belowbar, color.new(color.green, 0), text="BUY", textcolor=color.white, size=size.small)
+plotshape(signalSell, "Sell Signal", shape.labeldown, location.abovebar, color.new(color.red, 0), text="SELL", textcolor=color.white, size=size.small)
+
+// Plot exit signals on the chart.
+plotshape(signalExitBuy, "Exit Buy", shape.xcross, location.abovebar, color.new(color.orange, 0), size=size.tiny)
+plotshape(signalExitSell, "Exit Sell", shape.xcross, location.belowbar, color.new(color.orange, 0), size=size.tiny)
+
+
+// === ALERTS ===
+// Use alertcondition to make these signals available in the "Create Alert" dialog.
+// You can use placeholders like {{ticker}}, {{close}}, etc., in your alert message in the TradingView UI.
+alertcondition(signalBuy, title="Buy Signal", message="Buy Signal for {{ticker}}")
+alertcondition(signalSell, title="Sell Signal", message="Sell Signal for {{ticker}}")
+alertcondition(signalExitBuy, title="Exit Buy Signal", message="Exit Buy Signal for {{ticker}}")
+alertcondition(signalExitSell, title="Exit Sell Signal", message="Exit Sell Signal for {{ticker}}")

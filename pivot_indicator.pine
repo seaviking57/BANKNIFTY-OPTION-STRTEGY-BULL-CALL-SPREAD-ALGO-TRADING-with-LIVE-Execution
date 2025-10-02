@@ -1,0 +1,127 @@
+//@version=5
+indicator("Pivot Breakout + Trail by Prev Pivot", overlay=true)
+
+// === INPUTS ===
+leftBars        = input.int(5, "Pivot Left bars (L)", minval=1)
+rightBars       = input.int(3, "Pivot Right bars (R)", minval=1)
+useSession      = input.bool(false, "Use session hours filter?")
+sessionStartHour= input.int(9, "Session start hour", minval=0, maxval=23)
+sessionStartMin = input.int(15, "Session start minute", minval=0, maxval=59)
+sessionEndHour  = input.int(15, "Session end hour", minval=0, maxval=23)
+sessionEndMin   = input.int(30, "Session end minute", minval=0, maxval=59)
+
+// === HELPERS ===
+// Safe numeric test
+isValid(x) => not na(x) and x == x
+
+// === PIVOTS ===
+ph = ta.pivothigh(high, leftBars, rightBars)
+pl = ta.pivotlow(low, leftBars, rightBars)
+
+// Pivot storage
+var float lastHigh = na
+var float prevHigh = na
+var float lastLow  = na
+var float prevLow  = na
+var int   lastHighBar = na
+var int   prevHighBar = na
+var int   lastLowBar  = na
+var int   prevLowBar  = na
+
+// Update pivots
+if not na(ph)
+    if not na(lastHigh)
+        prevHigh := lastHigh
+        prevHighBar := lastHighBar
+    lastHigh := ph
+    lastHighBar := bar_index - rightBars
+
+if not na(pl)
+    if not na(lastLow)
+        prevLow := lastLow
+        prevLowBar := lastLowBar
+    lastLow := pl
+    lastLowBar := bar_index - rightBars
+
+// === PLOT PIVOTS ===
+plot(ph, "Pivot High", color.new(color.green, 0), 2, plot.style_circles, offset=-rightBars)
+plot(pl, "Pivot Low", color.new(color.red, 0), 2, plot.style_circles, offset=-rightBars)
+
+// === SESSION FILTER ===
+t = time
+hh = hour(t)
+mm = minute(t)
+nowMin = hh * 60 + mm
+startMin = sessionStartHour * 60 + sessionStartMin
+endMin   = sessionEndHour * 60 + sessionEndMin
+inSession = not useSession or (nowMin >= startMin and nowMin <= endMin)
+
+// === STATE MANAGEMENT & LOGIC ===
+var int   tradeState      = 0 // 0=flat, 1=long, -1=short
+var float activeLongStop  = na
+var float activeShortStop = na
+
+// --- ENTRY LOGIC ---
+canLong  = isValid(lastHigh) and (bar_index > lastHighBar) and close > lastHigh
+canShort = isValid(lastLow)  and (bar_index > lastLowBar)  and close < lastLow
+
+signalLong  = canLong  and tradeState == 0 and inSession
+signalShort = canShort and tradeState == 0 and inSession
+
+if signalLong
+    tradeState := 1
+    initStop = isValid(prevLow) ? prevLow : (isValid(lastLow) ? lastLow : na)
+    activeLongStop := initStop
+
+if signalShort
+    tradeState := -1
+    initStopS = isValid(prevHigh) ? prevHigh : (isValid(lastHigh) ? lastHigh : na)
+    activeShortStop := initStopS
+
+// --- TRAILING LOGIC ---
+if tradeState == 1
+    candidate = isValid(prevLow) ? prevLow : (isValid(lastLow) ? lastLow : na)
+    if isValid(candidate)
+        if not isValid(activeLongStop) or candidate > activeLongStop
+            activeLongStop := candidate
+
+if tradeState == -1
+    candidateS = isValid(prevHigh) ? prevHigh : (isValid(lastHigh) ? lastHigh : na)
+    if isValid(candidateS)
+        if not isValid(activeShortStop) or candidateS < activeShortStop
+            activeShortStop := candidateS
+
+// --- EXIT LOGIC ---
+signalExitLong = tradeState == 1 and isValid(activeLongStop) and close < activeLongStop
+signalExitShort = tradeState == -1 and isValid(activeShortStop) and close > activeShortStop
+
+if signalExitLong or signalExitShort
+    tradeState := 0
+    activeLongStop := na
+    activeShortStop := na
+
+// === PLOT SIGNALS AND STOPS ===
+// Plot Stops
+longStopColor = tradeState == 1 ? color.red : na
+shortStopColor = tradeState == -1 ? color.red : na
+plot(activeLongStop, "Long Stop", longStopColor, 2, plot.style_linebr)
+plot(activeShortStop, "Short Stop", shortStopColor, 2, plot.style_linebr)
+
+// Plot Entry/Exit signals
+plotshape(signalLong, "Buy Signal", shape.labelup, location.belowbar, color.new(color.green, 0), size=size.small, text="BUY", textcolor=color.white)
+plotshape(signalShort, "Sell Signal", shape.labeldown, location.abovebar, color.new(color.red, 0), size=size.small, text="SELL", textcolor=color.white)
+plotshape(signalExitLong, "Exit Long", shape.square, location.abovebar, color.new(color.orange, 0), size=size.tiny, text="X", textcolor=color.white)
+plotshape(signalExitShort, "Exit Short", shape.square, location.belowbar, color.new(color.orange, 0), size=size.tiny, text="X", textcolor=color.white)
+
+// === ALERTS ===
+if signalLong
+    alert("Pivot Breakout Long: " + syminfo.ticker, alert.freq_once_per_bar)
+
+if signalShort
+    alert("Pivot Breakout Short: " + syminfo.ticker, alert.freq_once_per_bar)
+
+if signalExitLong
+    alert("Exit Long (Stop Hit): " + syminfo.ticker, alert.freq_once_per_bar)
+
+if signalExitShort
+    alert("Exit Short (Stop Hit): " + syminfo.ticker, alert.freq_once_per_bar)
